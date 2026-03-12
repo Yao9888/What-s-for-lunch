@@ -65,7 +65,7 @@ export default function App() {
       : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
 
     if (pool.length === 0) {
-      alert('库里还没有美食哦，快去添加吧！');
+      setFeedback({ type: 'error', message: '库里还没有美食哦，快去添加吧！' });
       return;
     }
 
@@ -113,13 +113,14 @@ export default function App() {
 
   const handleDeleteCategory = (id: string) => {
     if (data.categories.length <= 1) {
-      alert('至少保留一个分类哦！');
+      setFeedback({ type: 'error', message: '至少保留一个分类哦！' });
       return;
     }
     setData(prev => ({
       categories: prev.categories.filter(c => c.id !== id)
     }));
     if (selectedCategoryId === id) setSelectedCategoryId('all');
+    setFeedback({ type: 'success', message: '分类已成功删除' });
   };
 
   const handleAddShop = (categoryId: string, shopName: string) => {
@@ -189,18 +190,41 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const imported = JSON.parse(event.target?.result as string);
-        if (imported.categories) {
-          setData(imported);
-          setFeedback({ type: 'success', message: '数据导入成功！' });
+        if (imported.categories && Array.isArray(imported.categories)) {
+          setData(prev => {
+            const currentCategories = [...prev.categories];
+            
+            imported.categories.forEach((impCat: Category) => {
+              const existingIndex = currentCategories.findIndex(c => c.name === impCat.name);
+              
+              if (existingIndex !== -1) {
+                // 存在相同大类，合并小类（去重）
+                const existingCat = currentCategories[existingIndex];
+                const mergedShops = Array.from(new Set([...existingCat.shops, ...impCat.shops]));
+                currentCategories[existingIndex] = {
+                  ...existingCat,
+                  shops: mergedShops
+                };
+              } else {
+                // 不存在的大类，直接新增
+                // 为防止 ID 冲突，重新生成一个 ID
+                currentCategories.push({
+                  ...impCat,
+                  id: 'cat_' + Math.random().toString(36).substr(2, 9) + Date.now()
+                });
+              }
+            });
+            
+            return { categories: currentCategories };
+          });
+          setFeedback({ type: 'success', message: '数据合并导入成功！' });
         } else {
           throw new Error('Invalid format');
         }
       } catch (err) {
         setFeedback({ type: 'error', message: '导入失败，请检查文件格式。' });
       } finally {
-        // Clear input so same file can be selected again
         e.target.value = '';
-        // Auto hide feedback
         setTimeout(() => setFeedback(null), 3000);
       }
     };
@@ -382,13 +406,11 @@ export default function App() {
                 </div>
 
                 <div className="relative">
-                  <div className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100">
-                    <img 
-                      src="/api/attachments/975618f0-f001-447a-8532-680451457497" 
-                      alt="微信支付打赏码" 
-                      className="w-full h-auto block"
-                      referrerPolicy="no-referrer"
-                    />
+                  <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 flex flex-col items-center justify-center min-h-[200px]">
+                    <p className="text-xl font-bold text-brand-primary text-center leading-relaxed">
+                      疯狂周五<br/>
+                      微我 50 就行了
+                    </p>
                   </div>
                 </div>
 
@@ -506,6 +528,7 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
   const [selectedShops, setSelectedShops] = useState<string[]>([]);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const currentCategory = categories.find((c: any) => c.id === activeTab);
 
@@ -601,17 +624,51 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
           <span className="font-bold text-brand-primary">{currentCategory?.name}</span>
         </div>
         <button 
-          onClick={() => {
-            if (confirm(`确定要删除“${currentCategory?.name}”大类及其所有美食吗？`)) {
-              onDeleteCategory(activeTab);
-            }
-          }}
+          onClick={() => setShowDeleteConfirm(true)}
           className="p-2 text-red-500 hover:bg-red-50 text-xs font-bold flex items-center gap-1 rounded-lg"
         >
           <Trash2 size={16} />
           删除大类
         </button>
       </div>
+
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-[300px] rounded-3xl p-6 hand-drawn-border shadow-2xl space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 size={32} />
+                </div>
+                <h3 className="text-xl font-bold">删除大类？</h3>
+                <p className="text-gray-500 text-sm">确定要删除“{currentCategory?.name}”大类及其所有美食吗？此操作不可撤销。</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    onDeleteCategory(activeTab);
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="w-full py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors"
+                >
+                  确定删除
+                </button>
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <div className="flex gap-2">
         <input 
