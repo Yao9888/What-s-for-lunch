@@ -409,7 +409,7 @@ export default function App() {
                   <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 flex flex-col items-center justify-center min-h-[200px]">
                     <p className="text-xl font-bold text-brand-primary text-center leading-relaxed">
                       疯狂周五<br/>
-                      微我 50 就行了
+                      V小沈同学50
                     </p>
                   </div>
                 </div>
