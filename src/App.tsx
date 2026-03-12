@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Utensils, 
   Settings as SettingsIcon, 
@@ -532,6 +532,22 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
 
   const currentCategory = categories.find((c: any) => c.id === activeTab);
 
+  const allShops = useMemo(() => {
+    const shops: { name: string; categoryName: string }[] = [];
+    categories.forEach((cat: any) => {
+      cat.shops.forEach((shop: string) => {
+        shops.push({ name: shop, categoryName: cat.name });
+      });
+    });
+    return shops;
+  }, [categories]);
+
+  const suggestions = useMemo(() => {
+    const trimmed = newShop.trim().toLowerCase();
+    if (!trimmed) return [];
+    return allShops.filter(s => s.name.toLowerCase().includes(trimmed));
+  }, [newShop, allShops]);
+
   // Ensure activeTab is valid if a category was deleted
   useEffect(() => {
     if (!categories.find((c: any) => c.id === activeTab)) {
@@ -670,29 +686,56 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
         )}
       </AnimatePresence>
 
-      <div className="flex gap-2">
-        <input 
-          type="text" 
-          value={newShop}
-          onChange={(e) => setNewShop(e.target.value)}
-          placeholder={`在 ${currentCategory?.name} 中添加店名...`}
-          className="flex-1 p-3 rounded-brand border-2 border-brand-primary/10 focus:border-brand-primary outline-none text-sm"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+      <div className="relative">
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={newShop}
+            onChange={(e) => setNewShop(e.target.value)}
+            placeholder={`在 ${currentCategory?.name} 中添加店名...`}
+            className="flex-1 p-3 rounded-brand border-2 border-brand-primary/10 focus:border-brand-primary outline-none text-sm"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                onAddShop(activeTab, newShop);
+                setNewShop('');
+              }
+            }}
+          />
+          <button 
+            onClick={() => {
               onAddShop(activeTab, newShop);
               setNewShop('');
-            }
-          }}
-        />
-        <button 
-          onClick={() => {
-            onAddShop(activeTab, newShop);
-            setNewShop('');
-          }}
-          className="p-3 bg-brand-primary text-white rounded-brand"
-        >
-          <Plus size={20} />
-        </button>
+            }}
+            className="p-3 bg-brand-primary text-white rounded-brand"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        {/* Suggestions Dropdown */}
+        <AnimatePresence>
+          {suggestions.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute left-0 right-0 top-full mt-1 bg-white hand-drawn-border z-30 max-h-48 overflow-y-auto shadow-xl p-1"
+            >
+              {suggestions.map((s, idx) => (
+                <button
+                  key={`${s.name}-${s.categoryName}-${idx}`}
+                  onClick={() => {
+                    setNewShop(s.name);
+                  }}
+                  className="w-full text-left p-2 hover:bg-brand-bg rounded-lg text-xs font-medium flex justify-between items-center group"
+                >
+                  <span className="text-brand-primary">{s.name}</span>
+                  <span className="text-gray-400 group-hover:text-brand-primary/60"> - {s.categoryName}</span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
