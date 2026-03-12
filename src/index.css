@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #E3F2FD;
+  --color-brand-primary: #1A237E;
+  --color-brand-accent: #FF9800;
+  --color-brand-yellow: #FFEB3B;
+  --radius-brand: 20px;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-brand-primary font-sans;
+  }
+}
+
+@layer components {
+  .hand-drawn-border {
+    border: 3px solid #1A237E;
+    box-shadow: 4px 4px 0px #1A237E;
+    @apply rounded-brand;
+  }
+
+  .btn-primary {
+    @apply bg-brand-primary text-white px-6 py-3 rounded-brand font-bold transition-all active:translate-y-1 active:shadow-none;
+    box-shadow: 0px 4px 0px #0D1440;
+  }
+
+  .btn-accent {
+    @apply bg-brand-accent text-white px-6 py-3 rounded-brand font-bold transition-all active:translate-y-1 active:shadow-none;
+    box-shadow: 0px 4px 0px #E65100;
+  }
+
+  .card {
+    @apply bg-white p-6 rounded-brand;
+    border: 3px solid #1A237E;
+    box-shadow: 4px 4px 0px #1A237E;
+  }
+}
+
+/* Custom animations */
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-flash {
+  animation: flash 0.1s infinite;
+}
+
