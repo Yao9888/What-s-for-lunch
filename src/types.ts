@@ -8,4 +8,5 @@ export interface Category {
 
 export interface FoodData {
   categories: Category[];
+  ratings?: Record<string, number>; // key: categoryId + ":" + shopName
 }

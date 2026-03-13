@@ -17,18 +17,21 @@ import {
   X,
   MoveHorizontal,
   ClipboardList,
+  Star,
   Play,
   CheckCircle,
   AlertCircle,
   Heart,
-  Palette
+  Palette,
+  Search,
+  Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Category, FoodData, ThemeType } from './types';
 import { INITIAL_CATEGORIES, STORAGE_KEY, THEME_STORAGE_KEY } from './constants';
 
-type View = 'home' | 'manager' | 'questionnaire' | 'settings' | 'lottery';
+type View = 'home' | 'manager' | 'rating' | 'questionnaire' | 'settings' | 'lottery';
 
 export default function App() {
   const [data, setData] = useState<FoodData>(() => {
@@ -39,12 +42,17 @@ export default function App() {
     return (localStorage.getItem(THEME_STORAGE_KEY) as ThemeType) || 'default';
   });
   const [currentView, setCurrentView] = useState<View>('home');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all'>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all' | 'rating'>('all');
+  const [ratingFilter, setRatingFilter] = useState<{ type: 'exact' | 'min', value: number | 'unrated' | null }>({
+    type: 'exact',
+    value: null
+  });
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [spinningText, setSpinningText] = useState('');
   
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showClearRatingsConfirm, setShowClearRatingsConfirm] = useState(false);
   const [showDonation, setShowDonation] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
@@ -71,14 +79,44 @@ export default function App() {
     setCurrentView('home');
     setSelectedCategoryId('all');
   };
+  
+  const handleClearRatings = () => {
+    setData(prev => ({ ...prev, ratings: {} }));
+    setShowClearRatingsConfirm(false);
+    setFeedback({ type: 'success', message: '所有评分已清空' });
+    setTimeout(() => setFeedback(null), 3000);
+  };
 
   const startLottery = () => {
-    const pool = selectedCategoryId === 'all' 
-      ? data.categories.flatMap(c => c.shops)
-      : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
+    let pool: string[] = [];
+    
+    if (selectedCategoryId === 'rating') {
+      data.categories.forEach(cat => {
+        cat.shops.forEach(shop => {
+          const rating = data.ratings?.[`${cat.id}:${shop}`] || 0;
+          if (ratingFilter.value === 'unrated') {
+            if (rating === 0) pool.push(shop);
+          } else if (ratingFilter.value !== null) {
+            if (ratingFilter.type === 'exact') {
+              if (rating === ratingFilter.value) pool.push(shop);
+            } else {
+              if (rating >= (ratingFilter.value as number)) pool.push(shop);
+            }
+          }
+        });
+      });
+    } else {
+      pool = selectedCategoryId === 'all' 
+        ? data.categories.flatMap(c => c.shops)
+        : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
+    }
 
     if (pool.length === 0) {
-      setFeedback({ type: 'error', message: '库里还没有美食哦，快去添加吧！' });
+      const msg = selectedCategoryId === 'rating'
+        ? '哎呀，这个评分下还没有餐厅呢，去评分页面打个分吧！'
+        : '库里还没有美食哦，快去添加吧！';
+      setFeedback({ type: 'error', message: msg });
+      setTimeout(() => setFeedback(null), 3000);
       return;
     }
 
@@ -117,9 +155,27 @@ export default function App() {
   };
 
   const skipAnimation = () => {
-    const pool = selectedCategoryId === 'all' 
-      ? data.categories.flatMap(c => c.shops)
-      : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
+    let pool: string[] = [];
+    if (selectedCategoryId === 'rating') {
+      data.categories.forEach(cat => {
+        cat.shops.forEach(shop => {
+          const rating = data.ratings?.[`${cat.id}:${shop}`] || 0;
+          if (ratingFilter.value === 'unrated') {
+            if (rating === 0) pool.push(shop);
+          } else if (ratingFilter.value !== null) {
+            if (ratingFilter.type === 'exact') {
+              if (rating === ratingFilter.value) pool.push(shop);
+            } else {
+              if (rating >= (ratingFilter.value as number)) pool.push(shop);
+            }
+          }
+        });
+      });
+    } else {
+      pool = selectedCategoryId === 'all' 
+        ? data.categories.flatMap(c => c.shops)
+        : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
+    }
     stopLottery(pool, lastTextRef.current);
   };
 
@@ -135,6 +191,7 @@ export default function App() {
   const handleDeleteCategory = (id: string) => {
     if (data.categories.length <= 1) {
       setFeedback({ type: 'error', message: '至少保留一个分类哦！' });
+      setTimeout(() => setFeedback(null), 3000);
       return;
     }
     setData(prev => ({
@@ -142,6 +199,7 @@ export default function App() {
     }));
     if (selectedCategoryId === id) setSelectedCategoryId('all');
     setFeedback({ type: 'success', message: '分类已成功删除' });
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   const handleAddShop = (categoryId: string, shopName: string) => {
@@ -225,6 +283,17 @@ export default function App() {
     }
     setFeedback({ type: 'success', message });
     setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const handleRateShop = (categoryId: string, shopName: string, rating: number) => {
+    setData(prev => {
+      const key = `${categoryId}:${shopName}`;
+      const currentRating = prev.ratings?.[key] || 0;
+      // 如果点击的是当前已有的评分，则重置为 0（未评分）
+      const newRating = currentRating === rating ? 0 : rating;
+      const newRatings = { ...(prev.ratings || {}), [key]: newRating };
+      return { ...prev, ratings: newRatings };
+    });
   };
 
   const handleQuestionnaireSubmit = (answers: Record<string, string>) => {
@@ -319,7 +388,11 @@ export default function App() {
               }
             });
             
-            return { categories: currentCategories };
+            return { 
+              ...prev,
+              categories: currentCategories,
+              ratings: { ...(prev.ratings || {}), ...(imported.ratings || {}) }
+            };
           });
           setFeedback({ type: 'success', message: '数据合并导入成功！' });
         } else {
@@ -360,9 +433,12 @@ export default function App() {
               <HomeView 
                 categories={data.categories} 
                 selectedId={selectedCategoryId}
+                ratingFilter={ratingFilter}
                 onSelect={setSelectedCategoryId}
+                onRatingFilterChange={setRatingFilter}
                 onStart={startLottery}
                 onGoToManager={() => setCurrentView('manager')}
+                onGoToRating={() => setCurrentView('rating')}
                 onGoToQuestionnaire={() => setCurrentView('questionnaire')}
               />
             )}
@@ -379,6 +455,14 @@ export default function App() {
                 onMoveShops={handleMoveShops}
               />
             )}
+            {currentView === 'rating' && (
+              <RatingView 
+                categories={data.categories}
+                ratings={data.ratings}
+                onRate={handleRateShop}
+                onBack={() => setCurrentView('home')}
+              />
+            )}
             {currentView === 'questionnaire' && (
               <QuestionnaireView 
                 categories={data.categories}
@@ -392,6 +476,7 @@ export default function App() {
                 onExport={exportData}
                 onImport={importData}
                 onReset={() => setShowResetConfirm(true)}
+                onClearRatings={() => setShowClearRatingsConfirm(true)}
                 onDonate={() => setShowDonation(true)}
                 currentTheme={theme}
                 onThemeChange={setTheme}
@@ -402,6 +487,8 @@ export default function App() {
                 isSpinning={isSpinning}
                 spinningText={spinningText}
                 result={result}
+                categories={data.categories}
+                ratings={data.ratings}
                 onSkip={skipAnimation}
                 onBack={() => setCurrentView('home')}
                 onRetry={startLottery}
@@ -411,7 +498,7 @@ export default function App() {
         </main>
 
         {/* Footer Navigation (only on some views) */}
-        {['home', 'manager', 'questionnaire'].includes(currentView) && (
+        {['home', 'manager', 'rating', 'questionnaire'].includes(currentView) && (
           <footer className="p-4 border-t-2 border-brand-primary/10 flex justify-around bg-white">
             <button 
               onClick={() => setCurrentView('home')}
@@ -426,6 +513,13 @@ export default function App() {
             >
               <Plus size={24} />
               <span className="text-xs font-bold">管理</span>
+            </button>
+            <button 
+              onClick={() => setCurrentView('rating')}
+              className={`flex flex-col items-center gap-1 ${currentView === 'rating' ? 'text-brand-primary' : 'text-gray-400'}`}
+            >
+              <Star size={24} />
+              <span className="text-xs font-bold">评分</span>
             </button>
             <button 
               onClick={() => setCurrentView('questionnaire')}
@@ -462,6 +556,38 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => setShowResetConfirm(false)}
+                    className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    取消
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+          {showClearRatingsConfirm && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-[300px] rounded-3xl p-6 hand-drawn-border shadow-2xl space-y-6"
+              >
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Trash2 size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold">清空评分？</h3>
+                  <p className="text-gray-500 text-sm">确定要清空所有店铺的评分吗？此操作不可撤销。</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button 
+                    onClick={handleClearRatings}
+                    className="w-full py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors"
+                  >
+                    确定清空
+                  </button>
+                  <button 
+                    onClick={() => setShowClearRatingsConfirm(false)}
                     className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-colors"
                   >
                     取消
@@ -535,8 +661,9 @@ export default function App() {
 
 // --- Sub-Views ---
 
-function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, onGoToQuestionnaire }: any) {
+function HomeView({ categories, selectedId, ratingFilter, onSelect, onRatingFilterChange, onStart, onGoToManager, onGoToRating, onGoToQuestionnaire }: any) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
   const selectedCategory = categories.find((c: any) => c.id === selectedId);
 
   return (
@@ -548,7 +675,7 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
     >
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">今天想吃点啥？</h2>
-        <p className="text-gray-500 text-sm">别纠结了，让运气帮你决定吧 ✨</p>
+        <p className="text-gray-500 text-sm">拆个美食盲盒吧，看看今天和哪家餐厅最有缘！</p>
       </div>
 
       <div className="space-y-4">
@@ -559,6 +686,7 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
             onClick={() => {
               onSelect('all');
               setIsDropdownOpen(false);
+              setIsRatingOpen(false);
             }}
             className={`p-4 h-28 rounded-brand border-2 transition-all font-bold flex flex-col items-center justify-center gap-2 ${selectedId === 'all' ? 'border-brand-primary bg-brand-primary text-white' : 'border-brand-primary/10 bg-white text-brand-primary hover:border-brand-primary/30'}`}
           >
@@ -569,19 +697,21 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
           {/* Option 2: Selectable */}
           <div className="relative">
             <button 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`w-full h-28 p-4 rounded-brand border-2 transition-all font-bold flex flex-col items-center justify-center gap-2 ${selectedId !== 'all' ? 'border-brand-primary bg-brand-primary text-white' : 'border-brand-primary/10 bg-white text-brand-primary hover:border-brand-primary/30'}`}
+              onClick={() => {
+                setIsDropdownOpen(!isDropdownOpen);
+                setIsRatingOpen(false);
+              }}
+              className={`w-full h-28 p-4 rounded-brand border-2 transition-all font-bold flex flex-col items-center justify-center gap-2 ${(!['all', 'rating'].includes(selectedId)) ? 'border-brand-primary bg-brand-primary text-white' : 'border-brand-primary/10 bg-white text-brand-primary hover:border-brand-primary/30'}`}
             >
               <div className="text-2xl">🍱</div>
               <span className="truncate w-full text-center text-sm">
-                {selectedId === 'all' ? '指定分类' : selectedCategory?.name}
+                {(!['all', 'rating'].includes(selectedId)) ? selectedCategory?.name : '指定分类'}
               </span>
             </button>
 
             <AnimatePresence>
               {isDropdownOpen && (
                 <>
-                  {/* Backdrop to close dropdown */}
                   <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
                   <motion.div 
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -608,6 +738,85 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
               )}
             </AnimatePresence>
           </div>
+
+          {/* Option 3: Rating (New) */}
+          <div className="col-span-2 relative">
+            <button 
+              onClick={() => {
+                setIsRatingOpen(!isRatingOpen);
+                setIsDropdownOpen(false);
+              }}
+              className={`w-full p-4 rounded-brand border-2 transition-all font-bold flex items-center justify-center gap-4 ${selectedId === 'rating' ? 'border-brand-primary bg-brand-primary text-white' : 'border-brand-primary/10 bg-white text-brand-primary hover:border-brand-primary/30'}`}
+            >
+              <div className="text-2xl">⭐</div>
+              <div className="flex flex-col items-start">
+                <span className="text-sm">按评分抽取</span>
+                {selectedId === 'rating' && ratingFilter.value !== null && (
+                  <span className="text-[10px] opacity-80 font-normal">
+                    {ratingFilter.value === 'unrated' ? '未评分' : `${ratingFilter.type === 'exact' ? '精确' : '大于'} ${ratingFilter.value} 星`}
+                  </span>
+                )}
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {isRatingOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsRatingOpen(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white hand-drawn-border z-20 p-4 shadow-xl space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">筛选模式</div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => onRatingFilterChange({ ...ratingFilter, type: 'min' })}
+                          className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${ratingFilter.type === 'min' ? 'bg-brand-primary text-white' : 'bg-brand-primary/5 text-gray-400'}`}
+                        >
+                          大于星级
+                        </button>
+                        <button 
+                          onClick={() => onRatingFilterChange({ ...ratingFilter, type: 'exact' })}
+                          className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${ratingFilter.type === 'exact' ? 'bg-brand-primary text-white' : 'bg-brand-primary/5 text-gray-400'}`}
+                        >
+                          精确匹配
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button 
+                        onClick={() => {
+                          onRatingFilterChange({ ...ratingFilter, value: 'unrated' });
+                          onSelect('rating');
+                          setIsRatingOpen(false);
+                        }}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all ${ratingFilter.value === 'unrated' && selectedId === 'rating' ? 'bg-brand-primary text-white' : 'bg-brand-primary/5 text-brand-primary'}`}
+                      >
+                        未评分
+                      </button>
+                      {[1, 2, 3, 4, 5].map(val => (
+                        <button 
+                          key={val}
+                          onClick={() => {
+                            onRatingFilterChange({ ...ratingFilter, value: val });
+                            onSelect('rating');
+                            setIsRatingOpen(false);
+                          }}
+                          className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${ratingFilter.value === val && selectedId === 'rating' ? 'bg-brand-primary text-white' : 'bg-brand-primary/5 text-brand-primary'}`}
+                        >
+                          {val} <Star size={10} fill={ratingFilter.value === val && selectedId === 'rating' ? "currentColor" : "none"} />
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -616,12 +825,17 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
           <Play fill="currentColor" />
           开始抽取
         </button>
-        <div className="flex gap-3">
-          <button onClick={onGoToQuestionnaire} className="btn-primary flex-1 py-4 text-sm bg-brand-bg text-brand-primary border-2 border-brand-primary shadow-none">
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <button onClick={onGoToManager} className="btn-primary flex-1 py-4 text-sm bg-brand-bg text-brand-primary border-2 border-brand-primary shadow-none">
+              手动管理
+            </button>
+            <button onClick={onGoToRating} className="btn-primary flex-1 py-4 text-sm bg-brand-bg text-brand-primary border-2 border-brand-primary shadow-none">
+              美食评分
+            </button>
+          </div>
+          <button onClick={onGoToQuestionnaire} className="btn-primary w-full py-4 text-sm bg-brand-bg text-brand-primary border-2 border-brand-primary shadow-none">
             智能问卷录入
-          </button>
-          <button onClick={onGoToManager} className="btn-primary flex-1 py-4 text-sm bg-brand-bg text-brand-primary border-2 border-brand-primary shadow-none">
-            手动管理美食
           </button>
         </div>
       </div>
@@ -988,7 +1202,7 @@ function QuestionnaireView({ categories, onBack, onSubmit }: any) {
   );
 }
 
-function SettingsView({ onBack, onExport, onImport, onReset, onDonate, currentTheme, onThemeChange }: any) {
+function SettingsView({ onBack, onExport, onImport, onReset, onClearRatings, onDonate, currentTheme, onThemeChange }: any) {
   const themes = [
     { id: 'default', name: '经典靛蓝', primary: '#1A237E', bg: '#E3F2FD' },
     { id: 'blue', name: '清新海洋', primary: '#0277BD', bg: '#E1F5FE' },
@@ -1060,10 +1274,16 @@ function SettingsView({ onBack, onExport, onImport, onReset, onDonate, currentTh
 
         <div className="card space-y-4">
           <h3 className="font-bold border-b-2 border-brand-primary/5 pb-2">危险区域</h3>
-          <button onClick={onReset} className="w-full flex items-center justify-center gap-2 p-4 border-2 border-red-500 text-red-500 rounded-brand font-bold text-sm">
-            <RotateCcw size={20} />
-            重置所有数据
-          </button>
+          <div className="space-y-3">
+            <button onClick={onClearRatings} className="w-full flex items-center justify-center gap-2 p-4 border-2 border-red-500 text-red-500 rounded-brand font-bold text-sm">
+              <Trash2 size={20} />
+              清空所有评分
+            </button>
+            <button onClick={onReset} className="w-full flex items-center justify-center gap-2 p-4 border-2 border-red-500 text-red-500 rounded-brand font-bold text-sm">
+              <RotateCcw size={20} />
+              重置所有数据
+            </button>
+          </div>
         </div>
 
         <div className="card space-y-4">
@@ -1079,14 +1299,24 @@ function SettingsView({ onBack, onExport, onImport, onReset, onDonate, currentTh
 
         <div className="text-center text-xs text-gray-400 mt-8">
           <p>中午吃什么 v1.0.0</p>
-          <p>基于浏览器本地存储，治愈系随机美食抽取器</p>
+          <p>世界上最遥远的距离，是‘随便’到‘决定’的距离。</p>
         </div>
       </div>
     </motion.div>
   );
 }
 
-function LotteryView({ isSpinning, spinningText, result, onSkip, onBack, onRetry }: any) {
+function LotteryView({ isSpinning, spinningText, result, categories, ratings, onSkip, onBack, onRetry }: any) {
+  const resultRating = useMemo(() => {
+    if (!result || isSpinning) return null;
+    for (const cat of categories) {
+      if (cat.shops.includes(result)) {
+        return ratings?.[`${cat.id}:${result}`] || 0;
+      }
+    }
+    return 0;
+  }, [result, isSpinning, categories, ratings]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -1128,6 +1358,25 @@ function LotteryView({ isSpinning, spinningText, result, onSkip, onBack, onRetry
             >
               <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">最终决定是</span>
               <h3 className="text-4xl font-black text-brand-primary leading-tight">{result}</h3>
+              {resultRating !== null && (
+                <div className="flex items-center gap-1 mt-1">
+                  {resultRating > 0 ? (
+                    <>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star 
+                          key={star} 
+                          size={14} 
+                          className={star <= resultRating ? 'text-yellow-400' : 'text-gray-200'}
+                          fill={star <= resultRating ? "currentColor" : "none"}
+                        />
+                      ))}
+                      <span className="text-[10px] font-bold text-brand-primary/60 ml-1">{resultRating} 分</span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">未评分</span>
+                  )}
+                </div>
+              )}
               <div className="text-4xl mt-2">🎉</div>
             </motion.div>
           )}
@@ -1160,6 +1409,157 @@ function LotteryView({ isSpinning, spinningText, result, onSkip, onBack, onRetry
           </button>
         </motion.div>
       )}
+    </motion.div>
+  );
+}
+
+function RatingView({ categories, ratings, onRate, onBack }: any) {
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'exact' | 'min'>('exact');
+  const [filterValue, setFilterValue] = useState<number | null>(null);
+
+  const allShops = useMemo(() => {
+    const shops: { categoryId: string; categoryName: string; name: string; rating: number }[] = [];
+    categories.forEach((cat: any) => {
+      cat.shops.forEach((shop: string) => {
+        const rating = ratings?.[`${cat.id}:${shop}`] || 0;
+        shops.push({ categoryId: cat.id, categoryName: cat.name, name: shop, rating });
+      });
+    });
+    return shops;
+  }, [categories, ratings]);
+
+  const filteredShops = useMemo(() => {
+    return allShops.filter(shop => {
+      const matchesSearch = shop.name.toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+      
+      if (filterValue === null) return true;
+      
+      if (filterType === 'exact') {
+        return shop.rating === filterValue;
+      } else {
+        return shop.rating >= filterValue;
+      }
+    });
+  }, [allShops, search, filterType, filterValue]);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="flex flex-col gap-6 h-full"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="p-2 -ml-2 hover:bg-brand-bg rounded-full">
+            <ChevronLeft />
+          </button>
+          <h2 className="text-xl font-bold">美食评分</h2>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input 
+            type="text" 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索美食名称..."
+            className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-brand-primary/10 focus:border-brand-primary outline-none text-sm transition-all"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 p-4 bg-brand-primary/5 rounded-2xl border-2 border-brand-primary/5">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+              <Filter size={14} />
+              筛选星级
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setFilterType('min')}
+                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${filterType === 'min' ? 'bg-brand-primary text-white' : 'bg-white text-gray-400'}`}
+              >
+                大于星级
+              </button>
+              <button 
+                onClick={() => setFilterType('exact')}
+                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${filterType === 'exact' ? 'bg-brand-primary text-white' : 'bg-white text-gray-400'}`}
+              >
+                精确匹配
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between gap-1">
+            <button 
+              onClick={() => setFilterValue(null)}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filterValue === null ? 'bg-brand-primary text-white' : 'bg-white text-brand-primary border border-brand-primary/10'}`}
+            >
+              全部
+            </button>
+            {[1, 2, 3, 4, 5].map(val => (
+              <button 
+                key={val}
+                onClick={() => setFilterValue(val)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${filterValue === val ? 'bg-brand-primary text-white' : 'bg-white text-brand-primary border border-brand-primary/10'}`}
+              >
+                {val} <Star size={10} fill={filterValue === val ? "currentColor" : "none"} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+        {filteredShops.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            <Star size={48} className="mx-auto mb-4 opacity-10" />
+            <p className="text-sm">没有找到符合条件的美食哦</p>
+          </div>
+        ) : (
+          filteredShops.map((shop, idx) => (
+            <div key={`${shop.categoryId}-${shop.name}-${idx}`} className="card p-4 flex flex-col gap-3 group hover:border-brand-primary transition-all">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-brand-primary">{shop.name}</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{shop.categoryName}</p>
+                </div>
+                <div className="text-xs font-black text-brand-primary bg-brand-primary/5 px-2 py-1 rounded-lg">
+                  {shop.rating > 0 ? `${shop.rating} 分` : '未评分'}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      onClick={() => onRate(shop.categoryId, shop.name, star)}
+                      className="transition-transform active:scale-90"
+                    >
+                      <Star 
+                        size={24} 
+                        className={`${star <= shop.rating ? 'text-yellow-400' : 'text-gray-200'}`}
+                        fill={star <= shop.rating ? "currentColor" : "none"}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 ml-2">
+                  {shop.rating === 1 && '差评 / 不满意'}
+                  {shop.rating === 2 && '一般'}
+                  {shop.rating === 3 && '满意 / 中评'}
+                  {shop.rating === 4 && '非常满意 / 好评'}
+                  {shop.rating === 5 && '强烈推荐 / 满分'}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </motion.div>
   );
 }
