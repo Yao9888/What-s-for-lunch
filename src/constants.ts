@@ -11,3 +11,4 @@ export const INITIAL_CATEGORIES: Category[] = [
 ];
 
 export const STORAGE_KEY = "food_picker_data";
+export const THEME_STORAGE_KEY = "food_picker_theme";

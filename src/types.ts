@@ -1,3 +1,5 @@
+export type ThemeType = 'default' | 'blue' | 'pink';
+
 export interface Category {
   id: string;
   name: string;

@@ -19,12 +19,13 @@ import {
   Play,
   CheckCircle,
   AlertCircle,
-  Heart
+  Heart,
+  Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Category, FoodData } from './types';
-import { INITIAL_CATEGORIES, STORAGE_KEY } from './constants';
+import { Category, FoodData, ThemeType } from './types';
+import { INITIAL_CATEGORIES, STORAGE_KEY, THEME_STORAGE_KEY } from './constants';
 
 type View = 'home' | 'manager' | 'questionnaire' | 'settings' | 'lottery';
 
@@ -32,6 +33,9 @@ export default function App() {
   const [data, setData] = useState<FoodData>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : { categories: INITIAL_CATEGORIES };
+  });
+  const [theme, setTheme] = useState<ThemeType>(() => {
+    return (localStorage.getItem(THEME_STORAGE_KEY) as ThemeType) || 'default';
   });
   const [currentView, setCurrentView] = useState<View>('home');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all'>('all');
@@ -49,6 +53,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   const handleReset = () => {
     // 保留初始的一级分类，但清空所有二级分类（店铺）
@@ -174,14 +183,53 @@ export default function App() {
   };
 
   const handleQuestionnaireSubmit = (answers: Record<string, string>) => {
-    setData(prev => ({
-      categories: prev.categories.map(c => {
-        const input = answers[c.id] || '';
-        const newShops = input.split(/\s+/).filter(s => s.trim() && !c.shops.includes(s.trim()));
-        return { ...c, shops: [...c.shops, ...newShops] };
-      })
-    }));
+    let allDuplicates: string[] = [];
+    let addedCount = 0;
+
+    const nextCategories = data.categories.map(c => {
+      const input = answers[c.id];
+      if (!input || !input.trim()) return c;
+      
+      const rawInputs = input.split(/\s+/).map(s => s.trim()).filter(Boolean);
+      const seenInInput = new Set<string>();
+      const duplicatesInInput: string[] = [];
+      
+      rawInputs.forEach(s => {
+        if (seenInInput.has(s)) {
+          duplicatesInInput.push(s);
+        } else {
+          seenInInput.add(s);
+        }
+      });
+
+      const uniqueFromInput = Array.from(seenInInput);
+      const alreadyExists = uniqueFromInput.filter(s => c.shops.includes(s));
+      const trulyNew = uniqueFromInput.filter(s => !c.shops.includes(s));
+
+      if (duplicatesInInput.length > 0 || alreadyExists.length > 0) {
+        allDuplicates = [...allDuplicates, ...duplicatesInInput, ...alreadyExists];
+      }
+
+      addedCount += trulyNew.length;
+      return { ...c, shops: [...c.shops, ...trulyNew] };
+    });
+
+    setData({ ...data, categories: nextCategories });
+
+    let message = `已成功添加 ${addedCount} 家店 (๑•̀ㅂ•́)👍`;
+    if (allDuplicates.length > 0) {
+      const uniqueDuplicates = Array.from(new Set(allDuplicates));
+      // 限制显示数量，防止提示框过长
+      const displayLimit = 5;
+      const displayDuplicates = uniqueDuplicates.slice(0, displayLimit);
+      const moreCount = uniqueDuplicates.length - displayLimit;
+      
+      message += `\n注意：${displayDuplicates.join('、')}${moreCount > 0 ? ` 等 ${uniqueDuplicates.length} 项` : ''}重复已自动合并`;
+    }
+
+    setFeedback({ type: 'success', message });
     setCurrentView('home');
+    setTimeout(() => setFeedback(null), 5000);
   };
 
   const exportData = () => {
@@ -299,6 +347,8 @@ export default function App() {
                 onImport={importData}
                 onReset={() => setShowResetConfirm(true)}
                 onDonate={() => setShowDonation(true)}
+                currentTheme={theme}
+                onThemeChange={setTheme}
               />
             )}
             {currentView === 'lottery' && (
@@ -389,7 +439,7 @@ export default function App() {
                 feedback.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
               }`}>
                 {feedback.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-                <span className="font-bold text-sm">{feedback.message}</span>
+                <span className="font-bold text-sm whitespace-pre-wrap">{feedback.message}</span>
               </div>
             </motion.div>
           )}
@@ -546,7 +596,9 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
   const allShops = useMemo(() => {
     const shops: { name: string; categoryName: string }[] = [];
     categories.forEach((cat: any) => {
-      cat.shops.forEach((shop: string) => {
+      // Reverse shops within category to get newest first
+      const reversedShops = [...cat.shops].reverse();
+      reversedShops.forEach((shop: string) => {
         shops.push({ name: shop, categoryName: cat.name });
       });
     });
@@ -772,7 +824,7 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
             </button>
           </div>
         </div>
-        {currentCategory?.shops.map((shop: string) => (
+        {[...(currentCategory?.shops || [])].reverse().map((shop: string) => (
           <div 
             key={shop}
             className={`p-3 rounded-brand border-2 flex items-center justify-between transition-all ${selectedShops.includes(shop) ? 'border-brand-primary bg-brand-primary/5' : 'border-brand-primary/5 bg-white'}`}
@@ -838,7 +890,13 @@ function QuestionnaireView({ categories, onBack, onSubmit }: any) {
   );
 }
 
-function SettingsView({ onBack, onExport, onImport, onReset, onDonate }: any) {
+function SettingsView({ onBack, onExport, onImport, onReset, onDonate, currentTheme, onThemeChange }: any) {
+  const themes = [
+    { id: 'default', name: '经典靛蓝', primary: '#1A237E', bg: '#E3F2FD' },
+    { id: 'blue', name: '清新海洋', primary: '#0277BD', bg: '#E1F5FE' },
+    { id: 'pink', name: '浪漫樱粉', primary: '#C2185B', bg: '#FCE4EC' },
+  ];
+
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
@@ -854,6 +912,35 @@ function SettingsView({ onBack, onExport, onImport, onReset, onDonate }: any) {
       </div>
 
       <div className="space-y-4">
+        <div className="card space-y-4">
+          <h3 className="font-bold border-b-2 border-brand-primary/5 pb-2 flex items-center gap-2">
+            <Palette size={18} />
+            个性化主题
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            {themes.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onThemeChange(t.id)}
+                className={`flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all ${
+                  currentTheme === t.id ? 'border-brand-primary bg-brand-primary/5' : 'border-transparent hover:bg-gray-50'
+                }`}
+              >
+                <div 
+                  className="w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center relative overflow-hidden"
+                  style={{ backgroundColor: t.bg }}
+                >
+                  <div className="w-full h-1/2 absolute bottom-0" style={{ backgroundColor: t.primary }} />
+                  {currentTheme === t.id && <Check size={20} className="text-white z-10 drop-shadow-md" />}
+                </div>
+                <span className={`text-[10px] font-bold ${currentTheme === t.id ? 'text-brand-primary' : 'text-gray-500'}`}>
+                  {t.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="card space-y-4">
           <h3 className="font-bold border-b-2 border-brand-primary/5 pb-2">数据备份与迁移</h3>
           <div className="grid grid-cols-1 gap-3">
