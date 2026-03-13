@@ -639,11 +639,27 @@ export default function App() {
                 </div>
 
                 <div className="relative">
-                  <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 flex flex-col items-center justify-center min-h-[200px]">
-                    <p className="text-xl font-bold text-brand-primary text-center leading-relaxed">
-                      疯狂周五<br/>
-                      V小沈同学50
-                    </p>
+                  <div className="bg-white rounded-2xl p-4 shadow-xl border border-gray-100 flex flex-col items-center justify-center min-h-[240px]">
+                    {/* 提示：请将您的二维码图片上传到 public 文件夹，并命名为 qr-code.png */}
+                    <img 
+                      src="/qr-code.png" 
+                      alt="打赏二维码" 
+                      className="w-48 h-48 object-contain mb-4"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        // 如果图片加载失败（例如文件还没上传），显示备用文字
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = 'text-center p-4 text-brand-primary font-bold';
+                          fallback.innerHTML = '请上传二维码图片<br/><span class="text-[10px] font-normal text-gray-400">文件名需为 qr-code.png</span>';
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
+                    <p className="text-sm font-bold text-brand-primary">长按或扫码打赏</p>
                   </div>
                 </div>
 
