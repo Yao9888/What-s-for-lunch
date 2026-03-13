@@ -15,6 +15,7 @@ import {
   Upload,
   Check,
   X,
+  MoveHorizontal,
   ClipboardList,
   Play,
   CheckCircle,
@@ -182,6 +183,50 @@ export default function App() {
     }));
   };
 
+  const handleMoveShops = (sourceCategoryId: string, targetCategoryId: string, shopNames: string[]) => {
+    let duplicateCount = 0;
+    let movedCount = 0;
+    const duplicates: string[] = [];
+
+    setData(prev => {
+      const sourceCat = prev.categories.find(c => c.id === sourceCategoryId);
+      const targetCat = prev.categories.find(c => c.id === targetCategoryId);
+      
+      if (!sourceCat || !targetCat) return prev;
+
+      const newShopsInTarget = shopNames.filter(name => {
+        if (targetCat.shops.includes(name)) {
+          duplicates.push(name);
+          duplicateCount++;
+          return false;
+        }
+        movedCount++;
+        return true;
+      });
+
+      return {
+        ...prev,
+        categories: prev.categories.map(c => {
+          if (c.id === sourceCategoryId) {
+            return { ...c, shops: c.shops.filter(s => !shopNames.includes(s)) };
+          }
+          if (c.id === targetCategoryId) {
+            return { ...c, shops: [...c.shops, ...newShopsInTarget] };
+          }
+          return c;
+        })
+      };
+    });
+
+    let message = `成功移动 ${movedCount} 家店 (๑•̀ㅂ•́)👍`;
+    if (duplicateCount > 0) {
+      const uniqueDuplicates = Array.from(new Set(duplicates));
+      message += `\n注意：${uniqueDuplicates.slice(0, 3).join('、')}${uniqueDuplicates.length > 3 ? ' 等' : ''}重复店名已自动合并`;
+    }
+    setFeedback({ type: 'success', message });
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
   const handleQuestionnaireSubmit = (answers: Record<string, string>) => {
     let allDuplicates: string[] = [];
     let addedCount = 0;
@@ -331,6 +376,7 @@ export default function App() {
                 onClearCategory={handleClearCategory}
                 onAddCategory={handleAddCategory}
                 onDeleteCategory={handleDeleteCategory}
+                onMoveShops={handleMoveShops}
               />
             )}
             {currentView === 'questionnaire' && (
@@ -583,13 +629,14 @@ function HomeView({ categories, selectedId, onSelect, onStart, onGoToManager, on
   );
 }
 
-function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelete, onClearCategory, onAddCategory, onDeleteCategory }: any) {
+function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelete, onClearCategory, onAddCategory, onDeleteCategory, onMoveShops }: any) {
   const [activeTab, setActiveTab] = useState(categories[0]?.id);
   const [newShop, setNewShop] = useState('');
   const [selectedShops, setSelectedShops] = useState<string[]>([]);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
 
   const currentCategory = categories.find((c: any) => c.id === activeTab);
 
@@ -747,6 +794,47 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
             </motion.div>
           </div>
         )}
+
+        {showMoveMenu && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-[300px] rounded-3xl p-6 hand-drawn-border shadow-2xl space-y-4"
+            >
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 bg-brand-primary/5 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-2">
+                  <MoveHorizontal size={32} />
+                </div>
+                <h3 className="text-xl font-bold">移动到其他分类</h3>
+                <p className="text-gray-500 text-sm">请选择目标分类：</p>
+              </div>
+              <div className="max-h-60 overflow-y-auto space-y-2 p-1 custom-scrollbar">
+                {categories.filter((c: any) => c.id !== activeTab).map((c: any) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      onMoveShops(activeTab, c.id, selectedShops);
+                      setSelectedShops([]);
+                      setShowMoveMenu(false);
+                    }}
+                    className="w-full text-left p-4 rounded-xl border-2 border-brand-primary/5 hover:border-brand-primary hover:bg-brand-primary/5 transition-all text-sm font-bold flex items-center justify-between group"
+                  >
+                    <span>{c.name}</span>
+                    <span className="text-[10px] text-gray-400 group-hover:text-brand-primary">({c.shops.length})</span>
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => setShowMoveMenu(false)}
+                className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       <div className="relative">
@@ -804,21 +892,31 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
         <div className="flex justify-between items-center mb-2">
           <span className="text-xs font-bold text-gray-400">共 {currentCategory?.shops.length} 家</span>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {selectedShops.length > 0 && (
-              <button 
-                onClick={() => {
-                  onBatchDelete(activeTab, selectedShops);
-                  setSelectedShops([]);
-                }}
-                className="text-xs font-bold text-red-500 flex items-center gap-1"
-              >
-                删除选中 ({selectedShops.length})
-              </button>
+              <>
+                <button 
+                  onClick={() => setShowMoveMenu(true)}
+                  className="text-xs font-bold text-red-500 flex items-center gap-1 hover:opacity-80 transition-opacity"
+                >
+                  <MoveHorizontal size={14} />
+                  移动分类
+                </button>
+                <button 
+                  onClick={() => {
+                    onBatchDelete(activeTab, selectedShops);
+                    setSelectedShops([]);
+                  }}
+                  className="text-xs font-bold text-red-500 flex items-center gap-1 hover:opacity-80 transition-opacity"
+                >
+                  <Trash2 size={14} />
+                  删除选中 ({selectedShops.length})
+                </button>
+              </>
             )}
             <button 
               onClick={() => onClearCategory(activeTab)}
-              className="text-xs font-bold text-red-500 flex items-center gap-1"
+              className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors"
             >
               清空全类
             </button>
