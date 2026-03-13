@@ -44,18 +44,21 @@ export default function App() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTextRef = useRef<string>('');
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
   const handleReset = () => {
-    // Deep clone to ensure we don't have reference issues with the initial constant
-    const freshData = JSON.parse(JSON.stringify(INITIAL_CATEGORIES));
+    // 保留初始的一级分类，但清空所有二级分类（店铺）
+    const freshData = INITIAL_CATEGORIES.map(category => ({
+      ...category,
+      shops: []
+    }));
     setData({ categories: freshData });
     setShowResetConfirm(false);
     setCurrentView('home');
-    // Optional: Reset selection
     setSelectedCategoryId('all');
   };
 
@@ -79,19 +82,27 @@ export default function App() {
 
     timerRef.current = setInterval(() => {
       const randomIndex = Math.floor(Math.random() * pool.length);
-      setSpinningText(pool[randomIndex]);
+      const currentText = pool[randomIndex];
+      lastTextRef.current = currentText;
+      setSpinningText(currentText);
       count += interval;
       
       if (count >= duration) {
-        stopLottery(pool);
+        stopLottery(pool, currentText);
       }
     }, interval);
   };
 
-  const stopLottery = (pool: string[]) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    const finalIndex = Math.floor(Math.random() * pool.length);
-    setResult(pool[finalIndex]);
+  const stopLottery = (pool: string[], finalResult?: string) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Use the provided result, or the last one we saw, or a random one as a last resort
+    const resultToSet = finalResult !== undefined ? finalResult : (lastTextRef.current || pool[Math.floor(Math.random() * pool.length)]);
+    
+    setResult(resultToSet);
     setIsSpinning(false);
   };
 
@@ -99,7 +110,7 @@ export default function App() {
     const pool = selectedCategoryId === 'all' 
       ? data.categories.flatMap(c => c.shops)
       : data.categories.find(c => c.id === selectedCategoryId)?.shops || [];
-    stopLottery(pool);
+    stopLottery(pool, lastTextRef.current);
   };
 
   const handleAddCategory = (name: string) => {
