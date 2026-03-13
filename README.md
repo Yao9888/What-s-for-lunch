@@ -1,20 +1,40 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+中午吃什么 🍚
+一个帮你解决「中午吃什么」选择困难症的随机抽奖小工具！
+✨ 功能亮点
+    随机抽奖：支持「全库抽奖」或「指定分类」抽取，让运气帮你决定午饭
+    美食管理：手动添加 / 删除店铺，按「中式快餐、包子粥点、米线面条」等分类管理
+    智能录入：问卷式批量录入店名，系统自动去重，省心高效
+    数据安全：支持 JSON 格式数据备份 / 导入，换设备也不怕丢失数据
 
-# Run and deploy your AI Studio app
+🚀 快速上手
+1. 决定吃什么
+    打开 App，选择「全库抽奖」或「指定分类」
+    点击「开始抽取」，系统会随机推荐一家店
 
-This contains everything you need to run your app locally.
+2. 管理你的美食库
+    点击「手动管理美食」
+    选择对应分类，添加 / 删除你常去的店铺
+    也可以通过「智能问卷录入」批量添加多家店（店名用空格分隔）
 
-View your app in AI Studio: https://ai.studio/apps/a04c127d-96b9-4a89-b794-8bf085331554
+3. 数据备份与迁移
+    进入右上角「系统设置」
+    点击「导出数据备份 (JSON)」保存你的美食列表
+    换设备后，在新设备点击「导入数据备份」恢复数据
 
-## Run Locally
+📱 界面预览
+抽奖页面	随机抽取午饭，告别选择困难
+美食管理	分类增删店铺，自定义你的美食库
+智能问卷	批量录入店名，自动去重
+系统设置	数据备份 / 导入，重置所有数据
+🛠️ 技术说明
+    数据存储：本地 JSON 格式，便于备份和迁移
+    分类设计：支持多美食分类，适配不同饮食习惯
+    核心逻辑：基于随机数算法，保证抽奖公平性
 
-**Prerequisites:**  Node.js
+📝 使用示例
+    纠结中午吃什么 → 打开 App 点「开始抽取」
+    发现新的好吃店 → 去「手动管理美食」添加
+    换手机了 → 先导出备份，新手机导入即可
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+🤝 贡献
+欢迎提交 Issue 和 PR，一起让这个小工具更好用！
