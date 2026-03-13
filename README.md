@@ -38,3 +38,6 @@
 
 🤝 贡献
 欢迎提交 Issue 和 PR，一起让这个小工具更好用！
+
+<img width="409" height="679" alt="火狐截图_2026-03-13T13-21-04 249Z" src="https://github.com/user-attachments/assets/edb607da-11f5-4ff0-ac12-39be5c3a0ece" />
+
