@@ -995,7 +995,7 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
-        className={`flex gap-2 overflow-x-auto pb-2 custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`flex gap-2 overflow-x-auto pb-4 custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         {categories.map((c: any) => (
           <button 

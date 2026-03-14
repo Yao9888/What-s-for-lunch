@@ -72,19 +72,20 @@
 
 /* Custom scrollbar for horizontal categories */
 .custom-scrollbar::-webkit-scrollbar {
-  height: 4px;
+  height: 3px;
   display: block;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
+  background: transparent;
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--brand-primary);
   border-radius: 10px;
-  opacity: 0.5;
+  border: 1px solid transparent;
+  background-clip: content-box;
 }
 
 .custom-scrollbar {
