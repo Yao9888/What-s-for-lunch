@@ -70,3 +70,25 @@
   animation: flash 0.1s infinite;
 }
 
+/* Custom scrollbar for horizontal categories */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+  display: block;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--brand-primary);
+  border-radius: 10px;
+  opacity: 0.5;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-primary) rgba(0, 0, 0, 0.05);
+}
+
