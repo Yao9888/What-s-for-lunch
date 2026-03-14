@@ -868,6 +868,36 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
 
+  // Drag to scroll logic
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+  const [dragMoved, setDragMoved] = useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeftState(scrollRef.current.scrollLeft);
+    setDragMoved(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Scroll speed multiplier
+    if (Math.abs(walk) > 5) {
+      setDragMoved(true);
+      scrollRef.current.scrollLeft = scrollLeftState - walk;
+    }
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+  };
+
   const currentCategory = categories.find((c: any) => c.id === activeTab);
 
   const allShops = useMemo(() => {
@@ -959,11 +989,19 @@ function ManagerView({ categories, onBack, onAddShop, onDeleteShop, onBatchDelet
         </motion.div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+      <div 
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        className={`flex gap-2 overflow-x-auto pb-2 custom-scrollbar select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      >
         {categories.map((c: any) => (
           <button 
             key={c.id}
             onClick={() => {
+              if (dragMoved) return;
               setActiveTab(c.id);
               setSelectedShops([]);
             }}
