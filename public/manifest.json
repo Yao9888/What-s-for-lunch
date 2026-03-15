@@ -11,13 +11,13 @@
       "src": "https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg",
       "sizes": "192x192",
       "type": "image/jpeg",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
