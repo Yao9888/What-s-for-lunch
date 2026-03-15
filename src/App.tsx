@@ -24,7 +24,10 @@ import {
   Heart,
   Palette,
   Search,
-  Filter
+  Filter,
+  Smartphone,
+  Monitor,
+  Share
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -54,6 +57,8 @@ export default function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showClearRatingsConfirm, setShowClearRatingsConfirm] = useState(false);
   const [showDonation, setShowDonation] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,6 +72,27 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallGuide(true);
+    }
+  };
 
   const handleReset = () => {
     // 保留初始的一级分类，但清空所有二级分类（店铺）
@@ -478,6 +504,7 @@ export default function App() {
                 onReset={() => setShowResetConfirm(true)}
                 onClearRatings={() => setShowClearRatingsConfirm(true)}
                 onDonate={() => setShowDonation(true)}
+                onInstall={handleInstall}
                 currentTheme={theme}
                 onThemeChange={setTheme}
               />
@@ -617,6 +644,73 @@ export default function App() {
           )}
         </AnimatePresence>
         {/* Donation Modal */}
+        <AnimatePresence>
+          {showInstallGuide && (
+            <div className="fixed inset-0 z-[130] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-[340px] rounded-3xl p-8 hand-drawn-border shadow-2xl space-y-6 relative"
+              >
+                <button 
+                  onClick={() => setShowInstallGuide(false)}
+                  className="absolute top-4 right-4 p-2 text-gray-400 hover:text-brand-primary transition-colors"
+                >
+                  <X size={24} />
+                </button>
+                
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Smartphone className="text-brand-primary" size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-brand-primary">添加到主屏幕</h3>
+                  <p className="text-gray-500 text-sm">将应用保存到桌面，访问更快捷！</p>
+                </div>
+
+                <div className="space-y-4 text-sm">
+                  <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                    <p className="font-bold text-gray-700 flex items-center gap-2">
+                      <span className="w-5 h-5 bg-brand-primary text-white rounded-full flex items-center justify-center text-[10px]">1</span>
+                      iOS / Safari 用户：
+                    </p>
+                    <p className="text-gray-600 pl-7">
+                      点击浏览器底部的 <Share size={16} className="inline mx-1 text-blue-500" /> 按钮，然后选择 <span className="font-bold text-gray-800">“添加到主屏幕”</span>。
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                    <p className="font-bold text-gray-700 flex items-center gap-2">
+                      <span className="w-5 h-5 bg-brand-primary text-white rounded-full flex items-center justify-center text-[10px]">2</span>
+                      Android / Chrome 用户：
+                    </p>
+                    <p className="text-gray-600 pl-7">
+                      点击浏览器右上角的 <span className="font-bold text-gray-800">“三个点”</span> 菜单，选择 <span className="font-bold text-gray-800">“安装应用”</span> 或 <span className="font-bold text-gray-800">“添加到主屏幕”</span>。
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-2xl space-y-3">
+                    <p className="font-bold text-gray-700 flex items-center gap-2">
+                      <span className="w-5 h-5 bg-brand-primary text-white rounded-full flex items-center justify-center text-[10px]">3</span>
+                      电脑端：
+                    </p>
+                    <p className="text-gray-600 pl-7">
+                      点击地址栏右侧的 <Plus size={16} className="inline mx-1 text-brand-primary" /> 图标进行安装。
+                    </p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowInstallGuide(false)}
+                  className="w-full py-4 bg-brand-primary text-white rounded-2xl font-bold shadow-lg shadow-brand-primary/20"
+                >
+                  我知道了
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence>
           {showDonation && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
@@ -1256,7 +1350,7 @@ function QuestionnaireView({ categories, onBack, onSubmit }: any) {
   );
 }
 
-function SettingsView({ onBack, onExport, onImport, onReset, onClearRatings, onDonate, currentTheme, onThemeChange }: any) {
+function SettingsView({ onBack, onExport, onImport, onReset, onClearRatings, onDonate, onInstall, currentTheme, onThemeChange }: any) {
   const themes = [
     { id: 'default', name: '经典靛蓝', primary: '#1A237E', bg: '#E3F2FD' },
     { id: 'blue', name: '清新海洋', primary: '#0277BD', bg: '#E1F5FE' },
@@ -1338,6 +1432,17 @@ function SettingsView({ onBack, onExport, onImport, onReset, onClearRatings, onD
               重置所有数据
             </button>
           </div>
+        </div>
+
+        <div className="card space-y-4">
+          <h3 className="font-bold border-b-2 border-brand-primary/5 pb-2">快捷访问</h3>
+          <button onClick={onInstall} className="w-full flex items-center justify-between p-4 bg-blue-50 text-blue-600 rounded-brand font-bold text-sm transition-colors hover:bg-blue-100">
+            <div className="flex items-center gap-3">
+              <Monitor size={20} />
+              添加到桌面 / 屏幕
+            </div>
+            <span className="text-[10px] opacity-60">访问更快捷 🚀</span>
+          </button>
         </div>
 
         <div className="card space-y-4">

@@ -4,10 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>中午吃什么</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#FF6B6B" />
+    <link rel="apple-touch-icon" href="https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
 
