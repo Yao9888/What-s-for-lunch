@@ -8,15 +8,15 @@
   "theme_color": "#FF6B6B",
   "icons": [
     {
-      "src": "https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg",
+      "src": "https://pic.imgdb.cn/item/65696d5bc458853aef11440d.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg",
+      "src": "https://pic.imgdb.cn/item/65696d5bc458853aef11440d.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
