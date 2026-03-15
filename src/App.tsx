@@ -642,7 +642,7 @@ export default function App() {
                   <div className="bg-white rounded-2xl p-4 shadow-xl border border-gray-100 flex flex-col items-center justify-center min-h-[240px]">
                     {/* 提示：请将您的二维码图片上传到 public 文件夹，并命名为 qr-code.png */}
                     <img 
-                      src="/qr-code.png" 
+                      src="https://pic1.imgdb.cn/item/69b61f6b0ee6511f188ee2ec.jpg" 
                       alt="打赏二维码" 
                       className="w-48 h-48 object-contain mb-4"
                       referrerPolicy="no-referrer"
